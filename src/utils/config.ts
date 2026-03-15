@@ -8,6 +8,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export interface Config {
   appId?: string;
   appSecret?: string;
+  userAccessToken?: string;
   [key: string]: any;
 }
 

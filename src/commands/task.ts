@@ -1,6 +1,7 @@
 
 import { Command } from 'commander';
 import { getClient } from '../utils/client.js';
+import * as lark from '@larksuiteoapi/node-sdk';
 
 export function registerTaskCommand(program: Command) {
   const taskCmd = program
@@ -11,14 +12,18 @@ export function registerTaskCommand(program: Command) {
   taskCmd
     .command('list')
     .description('List tasks')
-    .option('--page-size <pageSize>', 'Page size', '20')
+    .option('--page-size <pageSize>', 'Page size', '50')
     .option('--page-token <pageToken>', 'Page token')
     .option('--start-time <startTime>', 'Start time (unix timestamp)')
     .option('--end-time <endTime>', 'End time (unix timestamp)')
     .option('--task-completed <taskCompleted>', 'Filter by completion status (true/false)')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+
         const res = await client.task.task.list({
           params: {
             page_size: parseInt(options.pageSize, 10),
@@ -27,7 +32,7 @@ export function registerTaskCommand(program: Command) {
             end_create_time: options.endTime,
             task_completed: options.taskCompleted === 'true' ? true : options.taskCompleted === 'false' ? false : undefined,
           },
-        });
+        }, userAccessToken ? lark.withUserAccessToken(userAccessToken) : undefined);
 
         if (res.code !== 0) {
           console.error(`Error listing tasks: [${res.code}] ${res.msg}`);
@@ -57,9 +62,13 @@ export function registerTaskCommand(program: Command) {
     .option('--description <description>', 'Task description')
     .option('--due <due>', 'Due time (unix timestamp or ISO string)')
     .option('--collaborator-ids <collaboratorIds>', 'Collaborator IDs (comma-separated)')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+
         const res = await client.task.task.create({
           data: {
             summary: options.summary,
@@ -76,7 +85,7 @@ export function registerTaskCommand(program: Command) {
               }
             }
           },
-        });
+        }, userAccessToken ? lark.withUserAccessToken(userAccessToken) : undefined);
 
         if (res.code !== 0) {
           console.error(`Error creating task: [${res.code}] ${res.msg}`);
@@ -99,14 +108,18 @@ export function registerTaskCommand(program: Command) {
     .command('complete')
     .description('Complete a task')
     .requiredOption('--task-id <taskId>', 'The ID of the task to complete')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+
         const res = await client.task.task.complete({
           path: {
             task_id: options.taskId,
           },
-        });
+        }, userAccessToken ? lark.withUserAccessToken(userAccessToken) : undefined);
 
         if (res.code !== 0) {
           console.error(`Error completing task: [${res.code}] ${res.msg}`);

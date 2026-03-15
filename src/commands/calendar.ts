@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { getClient } from '../utils/client.js';
+import * as lark from '@larksuiteoapi/node-sdk';
 
 export function registerCalendarCommand(program: Command) {
   const calendarCmd = program
@@ -10,28 +11,52 @@ export function registerCalendarCommand(program: Command) {
   calendarCmd
     .command('list')
     .description('List calendars')
-    .option('--page-size <pageSize>', 'Page size', '20')
+    .option('--page-size <pageSize>', 'Page size (min 50)', '50')
     .option('--page-token <pageToken>', 'Page token')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+
+        if (!userAccessToken) {
+            console.error('❌ Error: User Access Token is required for this command.');
+            console.error('Please run "lark-cli auth user" to authenticate first.');
+            process.exit(1);
+        }
+
+        // Construct params conditionally to avoid passing undefined values
+        // which might trigger field validation errors in the SDK.
+        const params: any = {};
+        if (options.pageSize) {
+            params.page_size = parseInt(options.pageSize, 10);
+        } else {
+            // Default to 50 if not specified (API requirement: min 50)
+            // Wait, option default is already '50', so options.pageSize will be '50'
+            // But let's be safe.
+            params.page_size = 50;
+        }
+        if (options.pageToken) {
+            params.page_token = options.pageToken;
+        }
+
         const res = await client.calendar.calendar.list({
-          params: {
-            page_size: parseInt(options.pageSize, 10),
-            page_token: options.pageToken,
-          },
-        });
+          params: params,
+        }, lark.withUserAccessToken(userAccessToken));
 
         if (res.code !== 0) {
           console.error(`Error listing calendars: [${res.code}] ${res.msg}`);
+          const errData = (res as any).error;
+          if (errData) console.error(JSON.stringify(errData, null, 2));
           process.exit(1);
         }
 
         if (program.opts().json) {
           console.log(JSON.stringify(res.data, null, 2));
         } else {
-          console.log(`Found ${res.data?.calendars?.length || 0} calendars.`);
-          res.data?.calendars?.forEach((cal) => {
+          console.log(`Found ${res.data?.calendar_list?.length || 0} calendars.`);
+          res.data?.calendar_list?.forEach((cal: any) => {
             console.log(`[${cal.calendar_id}] ${cal.summary} (${cal.type})`);
           });
         }
@@ -48,22 +73,32 @@ export function registerCalendarCommand(program: Command) {
     .requiredOption('--calendar-id <calendarId>', 'Calendar ID')
     .option('--start-time <startTime>', 'Start time (unix timestamp)')
     .option('--end-time <endTime>', 'End time (unix timestamp)')
-    .option('--page-size <pageSize>', 'Page size', '20')
+    .option('--page-size <pageSize>', 'Page size (min 50)', '50')
     .option('--page-token <pageToken>', 'Page token')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+
+        if (!userAccessToken) {
+            console.error('❌ Error: User Access Token is required for this command.');
+            process.exit(1);
+        }
+
+        const params: any = {};
+        if (options.pageSize) params.page_size = parseInt(options.pageSize, 10);
+        if (options.startTime) params.start_time = options.startTime;
+        if (options.endTime) params.end_time = options.endTime;
+        if (options.pageToken) params.page_token = options.pageToken;
+
         const res = await client.calendar.calendarEvent.list({
           path: {
             calendar_id: options.calendarId,
           },
-          params: {
-            start_time: options.startTime,
-            end_time: options.endTime,
-            page_size: parseInt(options.pageSize, 10),
-            page_token: options.pageToken,
-          },
-        });
+          params: params,
+        }, lark.withUserAccessToken(userAccessToken));
 
         if (res.code !== 0) {
           console.error(`Error listing events: [${res.code}] ${res.msg}`);
@@ -74,7 +109,7 @@ export function registerCalendarCommand(program: Command) {
           console.log(JSON.stringify(res.data, null, 2));
         } else {
           console.log(`Found ${res.data?.items?.length || 0} events.`);
-          res.data?.items?.forEach((event) => {
+          res.data?.items?.forEach((event: any) => {
             console.log(`[${event.event_id}] ${event.summary} (${event.start_time?.timestamp || event.start_time?.date} - ${event.end_time?.timestamp || event.end_time?.date})`);
           });
         }
@@ -94,10 +129,18 @@ export function registerCalendarCommand(program: Command) {
     .requiredOption('--end-time <endTime>', 'End time (unix timestamp)')
     .option('--description <description>', 'Event description')
     .option('--attendees <attendees>', 'Comma-separated list of user IDs to invite')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
         
+        if (!userAccessToken) {
+            console.error('❌ Error: User Access Token is required for this command.');
+            process.exit(1);
+        }
+
         const attendeeList = options.attendees ? options.attendees.split(',').map((id: string) => ({
             type: 'user',
             user_id: id 
@@ -115,10 +158,9 @@ export function registerCalendarCommand(program: Command) {
             },
             end_time: {
                 timestamp: options.endTime
-            },
-            attendees: attendeeList.length > 0 ? attendeeList : undefined
+            }
           },
-        });
+        }, lark.withUserAccessToken(userAccessToken));
 
         if (res.code !== 0) {
           console.error(`Error creating event: [${res.code}] ${res.msg}`);
@@ -143,9 +185,18 @@ export function registerCalendarCommand(program: Command) {
     .requiredOption('--start-time <startTime>', 'Start time (ISO 8601)')
     .requiredOption('--end-time <endTime>', 'End time (ISO 8601)')
     .requiredOption('--user-ids <userIds>', 'Comma-separated list of user IDs to query')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
+        const config = require('../utils/config').getConfig();
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+        
+        if (!userAccessToken) {
+            console.error('❌ Error: User Access Token is required for this command.');
+            process.exit(1);
+        }
+
         const userIds = options.userIds.split(',');
         
         // Use batch interface to query multiple users
@@ -158,7 +209,7 @@ export function registerCalendarCommand(program: Command) {
             time_max: options.endTime,
             user_ids: userIds
           }
-        });
+        }, lark.withUserAccessToken(userAccessToken));
 
         if (res.code !== 0) {
             console.error(`Error querying freebusy: [${res.code}] ${res.msg}`);

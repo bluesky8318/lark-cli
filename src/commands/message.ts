@@ -46,12 +46,12 @@ export function registerMessageCommand(program: Command) {
   messageCmd
     .command('list')
     .description('List messages in a chat')
-    .requiredOption('--container-id <containerId>', 'Container ID (chat_id)')
+    .requiredOption('--container-id <containerId>', 'Container ID (e.g. chat_id)')
     .option('--container-id-type <containerIdType>', 'Container ID type', 'chat')
+    .option('--page-size <pageSize>', 'Page size', '50')
+    .option('--page-token <pageToken>', 'Page token')
     .option('--start-time <startTime>', 'Start time (unix timestamp)')
     .option('--end-time <endTime>', 'End time (unix timestamp)')
-    .option('--page-size <pageSize>', 'Page size', '20')
-    .option('--page-token <pageToken>', 'Page token')
     .action(async (options) => {
       try {
         const client = getClient();

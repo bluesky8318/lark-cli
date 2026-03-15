@@ -84,7 +84,7 @@ export function registerBaseCommand(program: Command) {
     .description('List records in a Bitable table')
     .requiredOption('--app-token <appToken>', 'Bitable App Token')
     .requiredOption('--table-id <tableId>', 'Table ID')
-    .option('--page-size <pageSize>', 'Page size', '20')
+    .option('--page-size <pageSize>', 'Page size', '50')
     .option('--page-token <pageToken>', 'Page token')
     .option('--filter <filter>', 'Filter string (JSON)')
     .action(async (options) => {
