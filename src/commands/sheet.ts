@@ -1,5 +1,6 @@
 import { Command } from 'commander';
-import { getClient } from '../utils/client.js';
+import { getClient, withAuthRetry } from '../utils/client.js';
+import * as lark from '@larksuiteoapi/node-sdk';
 
 export function registerSheetCommand(program: Command) {
   const sheetCmd = program
@@ -11,15 +12,19 @@ export function registerSheetCommand(program: Command) {
     .description('Create a new spreadsheet')
     .option('--title <title>', 'Spreadsheet title')
     .option('--folder-token <folderToken>', 'Folder token where the sheet will be created')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
-        const res = await client.sheets.spreadsheet.create({
-          data: {
-            title: options.title,
-            folder_token: options.folderToken,
-          },
-        });
+
+        const res = await withAuthRetry(async (token) => {
+          return await client.sheets.spreadsheet.create({
+            data: {
+              title: options.title,
+              folder_token: options.folderToken,
+            },
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           console.error(`Error creating sheet: [${res.code}] ${res.msg}`);
@@ -43,14 +48,18 @@ export function registerSheetCommand(program: Command) {
     .command('meta')
     .description('Get spreadsheet metadata')
     .requiredOption('--spreadsheet-token <spreadsheetToken>', 'Spreadsheet Token')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
     .action(async (options) => {
       try {
         const client = getClient();
-        const res = await client.sheets.spreadsheet.get({
-          path: {
-            spreadsheet_token: options.spreadsheetToken,
-          },
-        });
+
+        const res = await withAuthRetry(async (token) => {
+          return await client.sheets.spreadsheet.get({
+            path: {
+              spreadsheet_token: options.spreadsheetToken,
+            },
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           console.error(`Error getting sheet meta: [${res.code}] ${res.msg}`);

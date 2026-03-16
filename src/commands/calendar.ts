@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getClient } from '../utils/client.js';
+import { getClient, withAuthRetry } from '../utils/client.js';
 import * as lark from '@larksuiteoapi/node-sdk';
 
 export function registerCalendarCommand(program: Command) {
@@ -17,13 +17,16 @@ export function registerCalendarCommand(program: Command) {
     .action(async (options) => {
       try {
         const client = getClient();
-        const config = require('../utils/config').getConfig();
-        const userAccessToken = options.userAccessToken || config.userAccessToken;
 
-        if (!userAccessToken) {
-            console.error('❌ Error: User Access Token is required for this command.');
-            console.error('Please run "lark-cli auth user" to authenticate first.');
-            process.exit(1);
+        if (!options.userAccessToken) {
+            // We check this here but withAuthRetry will also handle it if token is missing from config
+            // However, withAuthRetry relies on config or passed token.
+            // If we want to enforce "auth user" if missing, withAuthRetry does that.
+            // But let's keep the explicit check if we want to fail fast?
+            // Actually, the requirement is to auto-auth. So we should remove the fail-fast check
+            // unless we want to force user to have run auth at least once?
+            // No, `withAuthRetry` handles "no token found" by starting auth.
+            // So we can remove the explicit check here and let withAuthRetry handle it.
         }
 
         // Construct params conditionally to avoid passing undefined values
@@ -41,9 +44,11 @@ export function registerCalendarCommand(program: Command) {
             params.page_token = options.pageToken;
         }
 
-        const res = await client.calendar.calendar.list({
-          params: params,
-        }, lark.withUserAccessToken(userAccessToken));
+        const res = await withAuthRetry(async (token) => {
+          return await client.calendar.calendar.list({
+            params: params,
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           console.error(`Error listing calendars: [${res.code}] ${res.msg}`);
@@ -79,13 +84,6 @@ export function registerCalendarCommand(program: Command) {
     .action(async (options) => {
       try {
         const client = getClient();
-        const config = require('../utils/config').getConfig();
-        const userAccessToken = options.userAccessToken || config.userAccessToken;
-
-        if (!userAccessToken) {
-            console.error('❌ Error: User Access Token is required for this command.');
-            process.exit(1);
-        }
 
         const params: any = {};
         if (options.pageSize) params.page_size = parseInt(options.pageSize, 10);
@@ -93,12 +91,14 @@ export function registerCalendarCommand(program: Command) {
         if (options.endTime) params.end_time = options.endTime;
         if (options.pageToken) params.page_token = options.pageToken;
 
-        const res = await client.calendar.calendarEvent.list({
-          path: {
-            calendar_id: options.calendarId,
-          },
-          params: params,
-        }, lark.withUserAccessToken(userAccessToken));
+        const res = await withAuthRetry(async (token) => {
+          return await client.calendar.calendarEvent.list({
+            path: {
+              calendar_id: options.calendarId,
+            },
+            params: params,
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           console.error(`Error listing events: [${res.code}] ${res.msg}`);
@@ -133,34 +133,29 @@ export function registerCalendarCommand(program: Command) {
     .action(async (options) => {
       try {
         const client = getClient();
-        const config = require('../utils/config').getConfig();
-        const userAccessToken = options.userAccessToken || config.userAccessToken;
-        
-        if (!userAccessToken) {
-            console.error('❌ Error: User Access Token is required for this command.');
-            process.exit(1);
-        }
 
         const attendeeList = options.attendees ? options.attendees.split(',').map((id: string) => ({
             type: 'user',
             user_id: id 
         })) : [];
 
-        const res = await client.calendar.calendarEvent.create({
-          path: {
-            calendar_id: options.calendarId,
-          },
-          data: {
-            summary: options.summary,
-            description: options.description,
-            start_time: {
-                timestamp: options.startTime
+        const res = await withAuthRetry(async (token) => {
+          return await client.calendar.calendarEvent.create({
+            path: {
+              calendar_id: options.calendarId,
             },
-            end_time: {
-                timestamp: options.endTime
-            }
-          },
-        }, lark.withUserAccessToken(userAccessToken));
+            data: {
+              summary: options.summary,
+              description: options.description,
+              start_time: {
+                  timestamp: options.startTime
+              },
+              end_time: {
+                  timestamp: options.endTime
+              }
+            },
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           console.error(`Error creating event: [${res.code}] ${res.msg}`);
@@ -189,27 +184,22 @@ export function registerCalendarCommand(program: Command) {
     .action(async (options) => {
       try {
         const client = getClient();
-        const config = require('../utils/config').getConfig();
-        const userAccessToken = options.userAccessToken || config.userAccessToken;
-        
-        if (!userAccessToken) {
-            console.error('❌ Error: User Access Token is required for this command.');
-            process.exit(1);
-        }
 
         const userIds = options.userIds.split(',');
         
         // Use batch interface to query multiple users
-        const res = await client.calendar.freebusy.batch({
-          params: {
-            user_id_type: 'user_id', 
-          },
-          data: {
-            time_min: options.startTime,
-            time_max: options.endTime,
-            user_ids: userIds
-          }
-        }, lark.withUserAccessToken(userAccessToken));
+        const res = await withAuthRetry(async (token) => {
+          return await client.calendar.freebusy.batch({
+            params: {
+              user_id_type: 'user_id', 
+            },
+            data: {
+              time_min: options.startTime,
+              time_max: options.endTime,
+              user_ids: userIds
+            }
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
             console.error(`Error querying freebusy: [${res.code}] ${res.msg}`);
@@ -220,9 +210,9 @@ export function registerCalendarCommand(program: Command) {
           console.log(JSON.stringify(res.data, null, 2));
         } else {
             console.log('Freebusy information:');
-            res.data?.freebusy_lists?.forEach((list) => {
+            res.data?.freebusy_lists?.forEach((list: any) => {
                 console.log(`User: ${list.user_id}`);
-                list.freebusy_items?.forEach((item) => {
+                list.freebusy_items?.forEach((item: any) => {
                     console.log(`  ${item.start_time} - ${item.end_time}`);
                 });
             });

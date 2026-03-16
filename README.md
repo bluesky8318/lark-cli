@@ -27,22 +27,29 @@ npm link
 
 在使用以下功能前，请务必先完成 **1. 认证配置**。所有的命令如果执行失败，会返回非 0 退出码并在终端打印错误详情。
 
-### 1. 认证配置 (Auth)
+### 1. 认证 (Authentication)
 
-在使用任何功能前，你需要提供飞书自建应用的 `App ID` 和 `App Secret` 进行身份认证。
+Lark CLI 支持两种认证模式：
+1. **App 认证**：配置 App ID 和 App Secret，适用于大多数管理操作。
+2. **用户认证 (User Auth)**：通过 OAuth2 登录，以用户身份访问日历、任务、文档等个人数据。大部分命令都支持 `--user-access-token` 选项来显式指定用户 Token。
 
-**方式一：本地持久化登录 (推荐)**
-通过命令行配置，配置将保存在本地的 `~/.lark-cli/config.json` 文件中。
+> **智能 Token 刷新**：当执行需要用户权限的命令时，如果 Token 已过期或无效，CLI 会自动弹出浏览器窗口引导重新授权，授权成功后自动重试并继续执行原命令，无需手动干预。
+
+**配置 App 凭证：**
 ```bash
-lark-cli auth login --app-id <your_app_id> --app-secret <your_app_secret>
+lark-cli auth login --app-id <App ID> --app-secret <App Secret>
 ```
-
-**方式二：环境变量**
-除了本地配置，工具也支持读取环境变量或项目根目录的 `.env` 文件。
-```env
+或者通过环境变量配置：
+```bash
 LARK_APP_ID=your_app_id
 LARK_APP_SECRET=your_app_secret
 ```
+
+**用户登录 (OAuth2)：**
+```bash
+lark-cli auth user
+```
+执行后，CLI 会启动本地服务并生成授权链接。在浏览器中完成授权后，Token 将自动保存到本地配置。
 
 **检查认证状态：**
 验证当前是否已经配置了有效的认证信息，以及正在使用哪种凭证。
@@ -188,6 +195,8 @@ lark-cli task list \
   [--task-completed <true|false>] \
   [--page-size 20] [--page-token <token>]
 ```
+- 默认列出未完成的任务，并按截止时间正序排列（无截止时间或 1970 年的排在最后）。
+- 使用 `--task-completed true` 可查看已完成任务。
 
 **6.2 创建任务**
 ```bash
@@ -217,6 +226,60 @@ lark-cli sheet create [--title "<表格标题>"] [--folder-token <文件夹Token
 **7.2 获取电子表格元数据**
 ```bash
 lark-cli sheet meta --spreadsheet-token <电子表格Token>
+```
+
+---
+
+### 8. 云空间文件 (Drive)
+
+管理云空间文件和文件夹。
+
+**8.1 列出文件**
+```bash
+lark-cli drive list [--folder-token <文件夹Token>]
+```
+默认列出根目录文件。
+
+**8.2 上传文件**
+```bash
+lark-cli drive upload \
+  --file-path <本地文件路径> \
+  --parent-token <目标文件夹Token>
+```
+
+**8.3 下载文件**
+```bash
+lark-cli drive download \
+  --file-token <文件Token> \
+  --output-path <保存路径>
+```
+
+**8.4 创建文件夹**
+```bash
+lark-cli drive create-folder \
+  --name <文件夹名称> \
+  --parent-token <父文件夹Token>
+```
+
+---
+
+### 9. 用户信息 (User)
+
+**9.1 获取当前用户信息**
+```bash
+lark-cli auth me [--force-refresh]
+```
+- 查看当前登录用户的详细信息（如 User ID, Tenant Key 等）。
+- 默认优先从本地缓存读取。使用 `--force-refresh` 参数可强制从服务器获取最新信息。
+- 如果 Token 过期，会自动触发重新认证。
+
+---
+
+### 10. 搜索 (Search)
+
+**10.1 搜索云空间文件**
+```bash
+lark-cli search file --query "<搜索关键词>"
 ```
 
 ---

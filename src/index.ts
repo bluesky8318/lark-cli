@@ -8,6 +8,8 @@ import { registerBaseCommand } from './commands/base.js';
 import { registerCalendarCommand } from './commands/calendar.js';
 import { registerTaskCommand } from './commands/task.js';
 import { registerSheetCommand } from './commands/sheet.js';
+import { registerDriveCommand } from './commands/drive.js';
+import { registerSearchCommand } from './commands/search.js';
 
 // Load environment variables from .env file if present
 dotenv.config();
@@ -30,6 +32,8 @@ registerBaseCommand(program);
 registerCalendarCommand(program);
 registerTaskCommand(program);
 registerSheetCommand(program);
+registerDriveCommand(program);
+registerSearchCommand(program);
 
 program.parse(process.argv);
 

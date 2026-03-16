@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getClient } from '../utils/client.js';
+import { getClient, withAuthRetry } from '../utils/client.js';
 import * as lark from '@larksuiteoapi/node-sdk';
 
 export function registerDocCommand(program: Command) {
@@ -16,15 +16,15 @@ export function registerDocCommand(program: Command) {
     .action(async (options) => {
       try {
         const client = getClient();
-        const config = require('../utils/config').getConfig();
-        const userAccessToken = options.userAccessToken || config.userAccessToken;
 
-        const res = await client.docx.document.create({
-          data: {
-            title: options.title,
-            folder_token: options.folderToken,
-          },
-        }, userAccessToken ? lark.withUserAccessToken(userAccessToken) : undefined);
+        const res = await withAuthRetry(async (token) => {
+          return await client.docx.document.create({
+            data: {
+              title: options.title,
+              folder_token: options.folderToken,
+            },
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           console.error(`Error creating doc: [${res.code}] ${res.msg}`);
@@ -52,14 +52,14 @@ export function registerDocCommand(program: Command) {
     .action(async (options) => {
       try {
         const client = getClient();
-        const config = require('../utils/config').getConfig();
-        const userAccessToken = options.userAccessToken || config.userAccessToken;
 
-        const res = await client.docx.document.rawContent({
-          path: {
-            document_id: options.documentId,
-          },
-        }, userAccessToken ? lark.withUserAccessToken(userAccessToken) : undefined);
+        const res = await withAuthRetry(async (token) => {
+          return await client.docx.document.rawContent({
+            path: {
+              document_id: options.documentId,
+            },
+          }, lark.withUserAccessToken(token));
+        }, { userAccessToken: options.userAccessToken });
 
         if (res.code !== 0) {
           if (res.code === 99991668 || res.code === 99991663 || res.code === 99991664) {

@@ -1,8 +1,10 @@
 import { Command } from 'commander';
-import { updateConfig } from '../utils/config.js';
+import { updateConfig, getConfig } from '../utils/config.js';
+import { getClient, withAuthRetry } from '../utils/client.js';
 import axios from 'axios';
 import http from 'http';
 import url from 'url';
+import * as lark from '@larksuiteoapi/node-sdk';
 
 export function registerAuthCommand(program: Command) {
   const authCmd = program
@@ -24,7 +26,6 @@ export function registerAuthCommand(program: Command) {
     .command('status')
     .description('Check current authentication status')
     .action(() => {
-      const { getConfig } = require('../utils/config');
       const config = getConfig();
       const envAppId = process.env.LARK_APP_ID;
       const envAppSecret = process.env.LARK_APP_SECRET;
@@ -48,6 +49,81 @@ export function registerAuthCommand(program: Command) {
         console.log('✅ User Access Token is configured.');
       } else {
         console.log('ℹ️  User Access Token is NOT configured (Optional, for accessing user-specific resources).');
+      }
+    });
+
+  authCmd
+    .command('me')
+    .description('Get current user information (checks User Access Token)')
+    .option('--user-access-token <userAccessToken>', 'User Access Token for authentication')
+    .option('--force-refresh', 'Force refresh user info from server')
+    .action(async (options) => {
+      try {
+        const config = getConfig();
+        // Use userAccessToken from options if provided, otherwise try config
+        const userAccessToken = options.userAccessToken || config.userAccessToken;
+        
+        // If we have token and userInfo in config, and no explicit token override, try to use cached info first
+        // Skip cache if --force-refresh is set
+        if (!options.forceRefresh && !options.userAccessToken && config.userInfo && userAccessToken) {
+            // console.log('ℹ️  Using cached user info from config.');
+            console.log(`✅ User Authenticated (Cached):`);
+            console.log(`Name: ${config.userInfo.name}`);
+            console.log(`En Name: ${config.userInfo.en_name}`);
+            console.log(`Avatar: ${config.userInfo.avatar_url}`);
+            console.log(`Open ID: ${config.userInfo.open_id}`);
+            console.log(`Union ID: ${config.userInfo.union_id}`);
+            console.log(`User ID: ${config.userInfo.user_id}`);
+            console.log(`Tenant Key: ${config.userInfo.tenant_key}`);
+            return;
+        }
+
+        const client = getClient();
+        
+        const res = await withAuthRetry(async (token) => {
+          // Use raw API call to avoid SDK compatibility issues with user_access_token
+          try {
+             const rawRes = await axios.get('https://open.feishu.cn/open-apis/authen/v1/user_info', {
+                 headers: { Authorization: `Bearer ${token}` }
+             });
+             
+             if (rawRes.data.code === 0) {
+                 // Update config with fresh user info
+                 updateConfig({ userInfo: rawRes.data.data });
+                 return { code: 0, data: rawRes.data.data, msg: 'success' };
+             }
+             // Return error structure compatible with SDK response
+             return { code: rawRes.data.code, msg: rawRes.data.msg, error: rawRes.data };
+          } catch (e: any) {
+             if (e.response?.data) {
+                 return { code: e.response.data.code, msg: e.response.data.msg };
+             }
+             throw e;
+          }
+        }, { userAccessToken: options.userAccessToken });
+
+        if (res.code !== 0) {
+          console.error(`Error getting user info: [${res.code}] ${res.msg}`);
+          // Debugging: Print more details if available
+          // console.error('Full response:', JSON.stringify(res, null, 2));
+          process.exit(1);
+        }
+
+        if (program.opts().json) {
+          console.log(JSON.stringify(res.data, null, 2));
+        } else {
+          console.log(`✅ User Authenticated:`);
+          console.log(`Name: ${res.data?.name}`);
+          console.log(`En Name: ${res.data?.en_name}`);
+          console.log(`Avatar: ${res.data?.avatar_url}`);
+          console.log(`Open ID: ${res.data?.open_id}`);
+          console.log(`Union ID: ${res.data?.union_id}`);
+          console.log(`User ID: ${res.data?.user_id}`);
+          console.log(`Tenant Key: ${res.data?.tenant_key}`);
+        }
+      } catch (error: any) {
+        console.error('Failed to get user info:', error.message);
+        process.exit(1);
       }
     });
 

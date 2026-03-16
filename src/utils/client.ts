@@ -26,3 +26,6 @@ export function getClient(): lark.Client {
 
   return clientInstance;
 }
+
+// Re-export auth utils for easier access in commands
+export { withAuthRetry } from './auth.js';
