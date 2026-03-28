@@ -1,3 +1,5 @@
+更新：鉴于飞书已经推出官方cli工具（https://github.com/larksuite/cli），本项目方向调整为官方cli工具的扩展，基于官方cli工具，并提供一些官方工具短期没有支持的能力
+
 # Lark/Feishu CLI 工具 (lark-cli)
 
 基于 `@larksuiteoapi/node-sdk` 的核心能力封装的 CLI 工具。允许 CLI 环境（如各类 Agent 工具）通过命令行的方式调用飞书/Lark 的各项能力，包括：消息、文档、多维表格、日历、任务以及电子表格。
