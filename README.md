@@ -1,4 +1,6 @@
-更新：鉴于飞书已经推出官方cli工具（https://github.com/larksuite/cli），本项目方向调整为官方cli工具的扩展，基于官方cli工具，并提供一些官方工具短期没有支持的能力
+更新：鉴于飞书已经推出官方cli工具（https://github.com/larksuite/cli）
+
+本项目方向调整为官方cli工具的扩展，基于官方cli工具，并提供一些官方工具短期没有支持的能力
 
 # Lark/Feishu CLI 工具 (lark-cli)
 
